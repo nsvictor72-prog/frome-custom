@@ -1,0 +1,11 @@
+[build]
+  publish = "public"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  # The canvas library ships a native binary, so it is installed as-is instead of being bundled.
+  external_node_modules = ["@napi-rs/canvas"]
+
+[build.environment]
+  NODE_VERSION = "22"

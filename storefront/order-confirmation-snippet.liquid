@@ -1,0 +1,19 @@
+{% comment %}
+  Paste into Settings > Notifications > Order confirmation, where the download link should appear.
+  It shows only on orders that contain a video palette design. NOT YET TESTED in a live notification:
+  send yourself a test order before relying on it. Replace YOUR-NETLIFY-SITE with the Netlify site address.
+{% endcomment %}
+{% for line in line_items %}
+  {% assign frome_design = '' %}{% assign frome_token = '' %}
+  {% for p in line.properties %}
+    {% if p.first == '_design_id' %}{% assign frome_design = p.last %}{% endif %}
+    {% if p.first == '_design_token' %}{% assign frome_token = p.last %}{% endif %}
+  {% endfor %}
+  {% if frome_design != '' and frome_token != '' %}
+    <p style="margin:16px 0;">
+      <strong>Your Frome digital file</strong><br>
+      <a href="https://YOUR-NETLIFY-SITE.netlify.app/download?d={{ frome_design }}&t={{ frome_token }}">Download your file</a><br>
+      It is usually ready within a minute of payment. Keep this email: the link keeps working.
+    </p>
+  {% endif %}
+{% endfor %}
