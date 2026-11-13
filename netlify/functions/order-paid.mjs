@@ -8,6 +8,8 @@ import { env, json, keys, isDesignId, shopifyHmacOk } from "../../lib/common.mjs
 export const config = { path: "/api/shopify/order-paid", method: "POST" };
 
 const IN_PROGRESS_MS = 3 * 60 * 1000;
+/* Describes the stored secret without revealing it: its length, and whether it is all hex digits like Shopify's key. */
+const secretShape = () => { const s = (process.env.SHOPIFY_WEBHOOK_SECRET || "").trim(); return { length: s.length, hex: /^[a-f0-9]+$/i.test(s) }; };
 /* One plain line per notice in the function log. Never logs secrets, tokens or customer details. */
 const log = (what, extra = {}) => console.log("order-paid: " + what + " " + JSON.stringify(extra));
 
@@ -18,7 +20,7 @@ export default async (req, context) => {
   try { signed = shopifyHmacOk(raw, req.headers.get("x-shopify-hmac-sha256")); }
   catch (e) { log("SERVER NOT CONFIGURED", { topic, reason: String(e.message) }); return json({ error: "not_configured" }, 500); }
   if (!signed) {
-    log("REJECTED bad signature: SHOPIFY_WEBHOOK_SECRET in Netlify does not match the signing secret on Shopify's Webhooks page", { topic, hasSignatureHeader: !!req.headers.get("x-shopify-hmac-sha256"), bodyBytes: raw.length });
+    log("REJECTED bad signature: SHOPIFY_WEBHOOK_SECRET in Netlify does not match the signing secret on Shopify's Webhooks page", { topic, hasSignatureHeader: !!req.headers.get("x-shopify-hmac-sha256"), bodyBytes: raw.length, secretLength: secretShape().length, secretLooksLikeShopifyKey: secretShape().hex });
     return json({ error: "bad_signature" }, 401);
   }
   let order;
