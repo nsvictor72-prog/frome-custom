@@ -7,12 +7,23 @@ import { env, json, keys, isDesignId, shopifyHmacOk } from "../../lib/common.mjs
 
 export const config = { path: "/api/shopify/order-paid", method: "POST" };
 
+const IN_PROGRESS_MS = 3 * 60 * 1000;
+/* One plain line per notice in the function log. Never logs secrets, tokens or customer details. */
+const log = (what, extra = {}) => console.log("order-paid: " + what + " " + JSON.stringify(extra));
+
 export default async (req, context) => {
   const raw = await req.text();
-  if (!shopifyHmacOk(raw, req.headers.get("x-shopify-hmac-sha256"))) return json({ error: "bad_signature" }, 401);
+  const topic = req.headers.get("x-shopify-topic") || "unknown";
+  let signed;
+  try { signed = shopifyHmacOk(raw, req.headers.get("x-shopify-hmac-sha256")); }
+  catch (e) { log("SERVER NOT CONFIGURED", { topic, reason: String(e.message) }); return json({ error: "not_configured" }, 500); }
+  if (!signed) {
+    log("REJECTED bad signature: SHOPIFY_WEBHOOK_SECRET in Netlify does not match the signing secret on Shopify's Webhooks page", { topic, hasSignatureHeader: !!req.headers.get("x-shopify-hmac-sha256"), bodyBytes: raw.length });
+    return json({ error: "bad_signature" }, 401);
+  }
   let order;
-  try { order = JSON.parse(raw); } catch (e) { return json({ error: "bad_json" }, 400); }
-  if (order.financial_status !== "paid") return json({ ok: true, skipped: "not_paid" });
+  try { order = JSON.parse(raw); } catch (e) { log("REJECTED unreadable body", { topic }); return json({ error: "bad_json" }, 400); }
+  if (order.financial_status !== "paid") { log("ignored, order not paid", { topic, order: order.name, status: order.financial_status }); return json({ ok: true, skipped: "not_paid" }); }
 
   const variantIds = env("SHOPIFY_DIGITAL_VARIANT_IDS").split(",").map((s) => s.trim());
   const origin = (context && context.site && context.site.url) || new URL(req.url).origin;
@@ -27,6 +38,11 @@ export default async (req, context) => {
     const design = await store.getJSON(keys.design(id));
     if (!design) { done.push({ id, result: "unknown_design" }); continue; }
     if (design.status === "ready") { done.push({ id, result: "already_ready" }); continue; }
+    /* Several notices arrive for one order (created, paid, updated). Only the first starts a render. */
+    const started = Date.parse(design.renderStartedAt || design.queuedAt || 0);
+    if (design.paid && (design.status === "queued" || design.status === "rendering") && Date.now() - started < IN_PROGRESS_MS) {
+      done.push({ id, result: "already_in_progress" }); continue;
+    }
     design.paid = true;
     design.orderId = order.id; design.orderName = order.name || "";
     design.paidAt = design.paidAt || new Date().toISOString();
@@ -35,5 +51,7 @@ export default async (req, context) => {
     try { await triggerRender(id, origin); done.push({ id, result: "render_started" }); }
     catch (e) { done.push({ id, result: "render_trigger_failed" }); }   // the download page retries it
   }
+  const digitalLines = (order.line_items || []).filter((l) => variantIds.includes(String(l.variant_id))).length;
+  log(done.length ? "handled" : "ignored, no video design on this order", { topic, order: order.name, digitalLines, results: done.map((d) => d.result) });
   return json({ ok: true, designs: done });
 };

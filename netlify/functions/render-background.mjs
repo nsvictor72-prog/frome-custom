@@ -10,7 +10,8 @@ export const config = { path: "/api/render", method: "POST", background: true };
 export async function runRender(id) {
   const store = await openStore();
   const design = await store.getJSON(keys.design(id));
-  if (!design || !design.paid || design.status === "ready") return design && design.status;
+  if (!design || !design.paid || design.status === "ready") { console.log("render: skipped " + JSON.stringify({ found: !!design, paid: !!(design && design.paid), status: design && design.status })); return design && design.status; }
+  console.log("render: started " + JSON.stringify({ order: design.orderName, attempt: (design.attempts || 0) + 1, hasPhoto: !!design.hasPhoto }));
   design.status = "rendering"; design.attempts = (design.attempts || 0) + 1; design.renderStartedAt = new Date().toISOString();
   await store.setJSON(keys.design(id), design);
   try {
@@ -21,8 +22,10 @@ export async function runRender(id) {
     design.status = "ready"; design.readyAt = new Date().toISOString();
     design.file = { width: out.width, height: out.height, jpgBytes: out.jpg.length, pngBytes: out.png.length };
     delete design.error;
+    console.log("render: finished " + JSON.stringify({ order: design.orderName, jpgBytes: out.jpg.length, pngBytes: out.png.length }));
   } catch (e) {
     design.status = "failed"; design.error = String((e && e.message) || e).slice(0, 300);
+    console.log("render: FAILED " + JSON.stringify({ order: design.orderName, error: design.error }));
   }
   await store.setJSON(keys.design(id), design);
   return design.status;

@@ -40,6 +40,14 @@ r = await paid(hook({ id: 1, name: "#1001", financial_status: "pending", line_it
 const t0 = Date.now();
 r = await paid(hook({ id: 1, name: "#1001", financial_status: "paid", line_items: [line(111)] })); assert.equal((await r.json()).designs[0].result, "render_started"); ok("paid order unlocks and renders (" + (Date.now() - t0) + " ms)");
 r = await paid(hook({ id: 1, name: "#1001", financial_status: "paid", line_items: [line(111)] })); assert.equal((await r.json()).designs[0].result, "already_ready"); ok("repeat webhook is harmless");
+{ // a second notice while the first render is still running must not start another
+  const r2 = await save(post("https://x.test/api/design", { colors }, { origin: "https://frome.co" })); const id2 = (await r2.json()).id;
+  const f = path.join(dir, encodeURIComponent("design/" + id2 + ".json")); const d = JSON.parse(fs.readFileSync(f));
+  Object.assign(d, { paid: true, status: "rendering", renderStartedAt: new Date().toISOString() }); fs.writeFileSync(f, JSON.stringify(d));
+  const r3 = await paid(hook({ id: 2, name: "#1002", financial_status: "paid", line_items: [{ variant_id: 111, properties: [{ name: "_design_id", value: id2 }] }] }));
+  assert.equal((await r3.json()).designs[0].result, "already_in_progress"); fs.rmSync(f); ok("a notice during a running render does not start a second one");
+}
+process.env.SHOPIFY_WEBHOOK_SECRET = "  test-hook\n"; r = await paid(hook({ id: 3, name: "#1003", financial_status: "pending", line_items: [] })); assert.equal(r.status, 200); process.env.SHOPIFY_WEBHOOK_SECRET = "test-hook"; ok("a secret pasted with stray spaces still verifies");
 r = await dl(); const html = await r.text(); assert.match(html, /Your Frome is ready/); assert.match(html, /#1001/); ok("download page shows the file");
 for (const f of ["jpg", "png"]) {
   r = await dl("&f=" + f); const buf = Buffer.from(await r.arrayBuffer()); fs.writeFileSync("test/out-order." + f, buf);
