@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frome Video Palette</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Layout idea: a dim screening room. Controls in a narrow left rail, the canvas hung on a wall panel to the right.
+     Single theme by choice: the stripes are the only saturated color on the page. */
+  :root {
+    color-scheme: dark;
+    --room: #17151a;        /* page background, slightly plum so stripes read warm */
+    --panel: #211e26;       /* control rail and cards */
+    --wall: #2b2731;        /* wall behind the canvas */
+    --line: #3a3542;        /* borders */
+    --text: #f1edf3;        /* primary text */
+    --muted: #a9a2b3;       /* secondary text */
+    --lamp: #f2b56b;        /* projector-lamp accent */
+    --lamp-ink: #2a1c08;    /* text on accent */
+    --warn: #ff9c8a;        /* errors */
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--room);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .page { max-width: 1240px; margin: 0 auto; padding: 28px 20px 48px; display: flex; flex-direction: column; gap: 24px; }
+  header { display: flex; flex-direction: column; gap: 8px; max-width: 62ch; }
+  .tag {
+    align-self: flex-start; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--lamp); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px;
+  }
+  h1 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 4vw, 40px); line-height: 1.1; margin: 0; text-wrap: balance; }
+  header p { margin: 0; color: var(--muted); }
+
+  .work { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 24px; align-items: start; }
+  @media (max-width: 880px) { .work { grid-template-columns: minmax(0, 1fr); } .stage { order: -1; } }
+
+  .rail { display: flex; flex-direction: column; gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .card h2 { font-family: var(--display); font-weight: 500; font-size: 17px; margin: 0; display: flex; gap: 10px; align-items: baseline; }
+  .card h2 span { color: var(--lamp); font-variant-numeric: tabular-nums; font-size: 13px; }
+  .hint { color: var(--muted); font-size: 13px; margin: 0; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font: 600 14px var(--body); color: var(--text); background: transparent;
+    border: 1px solid var(--line); border-radius: 8px; padding: 9px 14px; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--muted); }
+  .btn.primary { background: var(--lamp); color: var(--lamp-ink); border-color: var(--lamp); }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn[disabled] { opacity: .45; cursor: not-allowed; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  label.btn:focus-within, .btn:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field > label, .field > .lab { font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+  .field output { color: var(--text); font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; accent-color: var(--lamp); margin: 0; }
+  input[type="text"], select {
+    font: 400 14px var(--body); color: var(--text); background: var(--room);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%;
+  }
+  .check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+  .check input { accent-color: var(--lamp); width: 16px; height: 16px; margin: 0; }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg label { text-align: center; font-size: 13px; padding: 7px 4px; cursor: pointer; color: var(--muted); border-left: 1px solid var(--line); }
+  .seg label:first-of-type { border-left: 0; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg input:checked + label { background: var(--lamp); color: var(--lamp-ink); font-weight: 600; }
+  .seg input:focus-visible + label { outline: 2px solid var(--lamp); outline-offset: -2px; }
+  fieldset { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  fieldset[disabled] { opacity: .45; }
+
+  .progress { height: 6px; border-radius: 3px; background: var(--room); overflow: hidden; }
+  .progress i { display: block; height: 100%; width: 0; background: var(--lamp); }
+  .status { font-size: 13px; color: var(--muted); margin: 0; min-height: 1.5em; }
+  .status.err { color: var(--warn); }
+
+  .stage { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 16px; }
+  @media (max-width: 880px) { .stage { position: static; } }
+  .wall {
+    background: radial-gradient(120% 90% at 50% 0%, #37323f 0%, var(--wall) 55%, #221f27 100%);
+    border: 1px solid var(--line); border-radius: 12px; padding: clamp(18px, 5vw, 56px);
+  }
+  canvas#view { display: block; width: 100%; height: auto; aspect-ratio: 5 / 2; border-radius: 2px; box-shadow: 0 18px 40px rgba(0,0,0,.55), 0 2px 0 rgba(255,255,255,.06) inset; background: #000; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; }
+  .chip { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 12px; color: var(--text); }
+  .chip.sample { color: var(--lamp); }
+  @media (prefers-reduced-motion: no-preference) { .progress i { transition: width .15s linear; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <span class="tag">Prototype</span>
+    <h1>Turn your own video into a Frome</h1>
+    <p>Each stripe is the average color of one moment in your video, in order from the first frame to the last. Add a photo and it sits behind the color as a faded background. Your video and photo stay on this device. Nothing is uploaded.</p>
+  </header>
+
+  <div class="work">
+    <div class="rail">
+      <section class="card" aria-labelledby="h-video">
+        <h2 id="h-video"><span>1</span>Your video</h2>
+        <div class="row">
+          <label class="btn primary" for="videoFile">Choose video<input type="file" id="videoFile" accept="video/*"></label>
+          <button class="btn" type="button" id="useSample">Use sample</button>
+        </div>
+        <div class="progress" aria-hidden="true"><i id="bar"></i></div>
+        <p class="status" id="videoStatus" role="status">Showing a sample palette. MP4 and MOV files work best.</p>
+        <div class="field">
+          <label for="detail">Stripes <output id="detailOut" for="detail">1500 · Frome standard</output></label>
+          <input type="range" id="detail" min="60" max="1500" step="20" value="1500">
+        </div>
+        <label class="check" for="smooth"><input type="checkbox" id="smooth">Blend stripes into a smooth gradient</label>
+      </section>
+
+      <section class="card" aria-labelledby="h-photo">
+        <h2 id="h-photo"><span>2</span>Background photo</h2>
+        <div class="row">
+          <label class="btn" for="photoFile">Choose photo<input type="file" id="photoFile" accept="image/*"></label>
+          <button class="btn" type="button" id="removePhoto">Remove photo</button>
+        </div>
+        <p class="status" id="photoStatus" role="status">Showing a sample photo.</p>
+        <fieldset id="photoControls">
+          <div class="field">
+            <span class="lab">Style</span>
+            <div class="seg" role="radiogroup" aria-label="Photo style">
+              <input type="radio" name="blend" id="blendTint" value="luminosity" checked><label for="blendTint">Tinted</label>
+              <input type="radio" name="blend" id="blendFade" value="source-over"><label for="blendFade">Faded</label>
+              <input type="radio" name="blend" id="blendSoft" value="soft-light"><label for="blendSoft">Soft light</label>
+            </div>
+          </div>
+          <div class="field">
+            <label for="strength">Photo strength <output id="strengthOut" for="strength">45%</output></label>
+            <input type="range" id="strength" min="5" max="90" step="1" value="45">
+          </div>
+          <div class="field">
+            <label for="zoom">Zoom <output id="zoomOut" for="zoom">1.0×</output></label>
+            <input type="range" id="zoom" min="60" max="300" step="5" value="100">
+          </div>
+          <div class="field">
+            <label for="posX">Move left / right</label>
+            <input type="range" id="posX" min="0" max="100" step="1" value="50">
+          </div>
+          <div class="field">
+            <label for="posY">Move up / down</label>
+            <input type="range" id="posY" min="0" max="100" step="1" value="50">
+          </div>
+          <label class="check" for="edgeFade"><input type="checkbox" id="edgeFade" checked>Fade the photo out toward its edges</label>
+        </fieldset>
+      </section>
+
+      <section class="card" aria-labelledby="h-finish">
+        <h2 id="h-finish"><span>3</span>Finish</h2>
+        <div class="field">
+          <label for="caption">Caption (optional)</label>
+          <input type="text" id="caption" maxlength="60" value="Maya &amp; Daniel · June 14, 2025" autocomplete="off">
+        </div>
+        <label class="check" for="finish"><input type="checkbox" id="finish" checked>Frome finish: fade to dark at top and bottom</label>
+        <div class="row">
+          <button class="btn" type="button" id="save" hidden>Save preview image</button>
+        </div>
+        <p class="hint" id="saveStatus" role="status">The saved preview carries a watermark. The print file would be made at full size when the order is placed.</p>
+      </section>
+    </div>
+
+    <div class="stage">
+      <div class="wall"><canvas id="view" width="1500" height="600" aria-label="Preview of your video palette canvas"></canvas></div>
+      <div class="meta">
+        <span><span class="chip sample" id="sourceChip">Sample palette</span> <span id="sourceNote">A wedding day, morning to night</span></span>
+        <span>Canvas shape 5 : 2, as in 30×12 in and 40×16 in</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---- shared renderer: identical to the file the server uses for the delivered image ---- */
+/* Frome video palette renderer.
+   One drawing routine for both the browser preview and the server's print-size file, so the two always match.
+   Everything is sized relative to the canvas, so the same design renders at 1500x600 or 9000x3600.
+
+   design = {
+     colors:   [[r,g,b], ...]   one per time slice, first frame to last
+     settings: { detail, smooth, blend, strength, zoom, posX, posY, edgeFade, finish, caption }
+   }
+   photo  = anything drawImage accepts (HTMLImageElement, canvas, napi Image), or null
+   opts   = { makeCanvas(w,h), watermark:boolean, captionFont:string } */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.FromeDraw = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  var BLENDS = { "luminosity": 1, "source-over": 1, "soft-light": 1 };
+
+  function clamp(v, lo, hi, dflt) { v = Number(v); if (!isFinite(v)) return dflt; return Math.max(lo, Math.min(hi, v)); }
+
+  /* Accept only known fields in known ranges. The server runs this on whatever the browser sends. */
+  function cleanSettings(s) {
+    s = s || {};
+    return {
+      detail: Math.round(clamp(s.detail, 60, 1500, 1500)),
+      smooth: !!s.smooth,
+      blend: BLENDS[s.blend] ? s.blend : "luminosity",
+      strength: clamp(s.strength, 0.05, 0.9, 0.45),
+      zoom: clamp(s.zoom, 0.6, 3, 1),
+      posX: clamp(s.posX, 0, 1, 0.5),
+      posY: clamp(s.posY, 0, 1, 0.5),
+      edgeFade: s.edgeFade !== false,
+      finish: s.finish !== false,
+      /* Captions keep Latin letters, digits and common punctuation: the characters the embedded caption font
+         carries, so the preview and the delivered file can never differ. */
+      caption: String(s.caption == null ? "" : s.caption).replace(/[\u0000-\u001f]/g, " ")
+        .replace(/[^\u0020-\u007e\u00a0-\u024f\u2013\u2014\u2018\u2019\u201c\u201d\u2022]/g, "").trim().slice(0, 60)
+    };
+  }
+  function cleanColors(colors, max) {
+    if (!Array.isArray(colors) || colors.length < 1 || colors.length > (max || 1500)) return null;
+    var out = [];
+    for (var i = 0; i < colors.length; i++) {
+      var c = colors[i];
+      if (!Array.isArray(c) || c.length !== 3) return null;
+      out.push([Math.round(clamp(c[0], 0, 255, 0)), Math.round(clamp(c[1], 0, 255, 0)), Math.round(clamp(c[2], 0, 255, 0))]);
+    }
+    return out;
+  }
+
+  function bucket(colors, n) {
+    var L = colors.length; if (n >= L) return colors;
+    var out = [];
+    for (var g = 0; g < n; g++) {
+      var s = Math.floor(g * L / n), e = Math.max(s + 1, Math.floor((g + 1) * L / n)), r = 0, gg = 0, b = 0;
+      for (var i = s; i < e; i++) { r += colors[i][0]; gg += colors[i][1]; b += colors[i][2]; }
+      var m = e - s; out.push([Math.round(r / m), Math.round(gg / m), Math.round(b / m)]);
+    }
+    return out;
+  }
+
+  function render(canvas, design, photo, opts) {
+    opts = opts || {};
+    var W = canvas.width, H = canvas.height, ctx = canvas.getContext("2d"), s = cleanSettings(design.settings);
+    var cols = bucket(design.colors || [], s.detail), n = cols.length;
+    var captionFont = opts.captionFont || "'IBM Plex Sans', 'Segoe UI', sans-serif";
+
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+
+    if (n) {
+      if (s.smooth) {
+        var grad = ctx.createLinearGradient(0, 0, W, 0);
+        for (var i = 0; i < n; i++) grad.addColorStop((i + 0.5) / n, "rgb(" + cols[i].join(",") + ")");
+        ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+      } else {
+        for (var k = 0; k < n; k++) {
+          var x0 = Math.round(k * W / n), x1 = Math.round((k + 1) * W / n);
+          ctx.fillStyle = "rgb(" + cols[k].join(",") + ")"; ctx.fillRect(x0, 0, x1 - x0, H);
+        }
+      }
+    }
+
+    if (photo) {
+      var iw = photo.naturalWidth || photo.width, ih = photo.naturalHeight || photo.height;
+      var layer = opts.makeCanvas(W, H), lc = layer.getContext("2d");
+      /* Photo fills the canvas height at zoom 1. Position moves its center, with travel at every zoom. */
+      var sc = (H / ih) * s.zoom, dw = iw * sc, dh = ih * sc;
+      var rx = Math.abs(W - dw) / 2 + W * 0.25, ry = Math.abs(H - dh) / 2 + H * 0.25;
+      var dx = W / 2 + (s.posX - 0.5) * 2 * rx - dw / 2, dy = H / 2 + (s.posY - 0.5) * 2 * ry - dh / 2;
+      lc.drawImage(photo, dx, dy, dw, dh);
+      if (s.edgeFade) {
+        var m = lc.createLinearGradient(dx, 0, dx + dw, 0);
+        m.addColorStop(0, "rgba(0,0,0,0)"); m.addColorStop(0.22, "rgba(0,0,0,1)");
+        m.addColorStop(0.78, "rgba(0,0,0,1)"); m.addColorStop(1, "rgba(0,0,0,0)");
+        lc.globalCompositeOperation = "destination-in"; lc.fillStyle = m; lc.fillRect(0, 0, W, H);
+        /* Same at the photo's own top and bottom, so a photo moved or shrunk inside the canvas never shows a hard edge. */
+        var mv = lc.createLinearGradient(0, dy, 0, dy + dh);
+        mv.addColorStop(0, "rgba(0,0,0,0)"); mv.addColorStop(0.14, "rgba(0,0,0,1)");
+        mv.addColorStop(0.86, "rgba(0,0,0,1)"); mv.addColorStop(1, "rgba(0,0,0,0)");
+        lc.fillStyle = mv; lc.fillRect(0, 0, W, H);
+      }
+      ctx.globalAlpha = s.strength; ctx.globalCompositeOperation = s.blend;
+      ctx.drawImage(layer, 0, 0);
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+    }
+
+    if (s.finish) {
+      /* Frome finish: stripes glow in the middle band and fall away to dark at the top and bottom. */
+      var f = ctx.createLinearGradient(0, 0, 0, H);
+      [[0, .82], [.1, .52], [.26, .14], [.4, 0], [.6, 0], [.74, .14], [.9, .52], [1, .82]].forEach(function (st) {
+        f.addColorStop(st[0], "rgba(0,0,0," + st[1] + ")");
+      });
+      ctx.fillStyle = f; ctx.fillRect(0, 0, W, H);
+    }
+
+    if (s.caption) {
+      var size = Math.round(H * 0.042), text = s.caption.toUpperCase(), gap = size * 0.22;
+      ctx.font = "600 " + size + "px " + captionFont;
+      ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+      ctx.shadowColor = "rgba(0,0,0,.55)"; ctx.shadowBlur = size * 0.6;
+      ctx.fillStyle = "rgba(255,255,255,.94)";
+      /* Letter spacing is laid out by hand so every browser and the server space the caption identically. */
+      var chars = Array.from(text), widths = [], total = 0, c;
+      for (c = 0; c < chars.length; c++) { widths[c] = ctx.measureText(chars[c]).width; total += widths[c]; }
+      total += gap * Math.max(0, chars.length - 1);
+      var x = (W - total) / 2, y = H - size * 1.5;
+      for (c = 0; c < chars.length; c++) { ctx.fillText(chars[c], x, y); x += widths[c] + gap; }
+      ctx.shadowBlur = 0; ctx.shadowColor = "transparent";
+    }
+
+    if (opts.watermark) {
+      ctx.save();
+      ctx.translate(W / 2, H / 2); ctx.rotate(-Math.PI / 9);
+      ctx.font = "700 " + Math.round(H * 0.09) + "px " + (opts.watermarkFont || "'Bricolage Grotesque', sans-serif");
+      ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,255,255,.22)";
+      for (var wy = -2; wy <= 2; wy++) for (var wx = -2; wx <= 2; wx++) ctx.fillText("FROME PREVIEW", wx * W * 0.42, wy * H * 0.34);
+      ctx.restore();
+    }
+    return canvas;
+  }
+
+  return { render: render, cleanSettings: cleanSettings, cleanColors: cleanColors, bucket: bucket };
+});
+</script>
+<script>
+(function () {
+  "use strict";
+  var MAX_SAMPLES = 1500;   /* one slice per preview pixel column, like the hairline stripes on a printed Frome */
+  var $ = function (id) { return document.getElementById(id); };
+  var view = $("view");
+  var state = { colors: [], photo: null, photoIsSample: true, run: 0 };
+
+  /* ---------- sample data ---------- */
+  function rng(seed) { return function () { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
+  function samplePalette() {
+    var keys = [
+      [0.00, [176, 190, 204]], [0.10, [214, 208, 196]], [0.22, [236, 226, 214]], [0.32, [118, 142, 104]],
+      [0.44, [168, 176, 130]], [0.55, [226, 196, 150]], [0.66, [232, 160, 104]], [0.75, [206, 112, 110]],
+      [0.84, [92, 70, 112]], [0.92, [38, 40, 76]], [1.00, [150, 104, 62]]
+    ];
+    var r = rng(7), out = [];
+    for (var i = 0; i < MAX_SAMPLES; i++) {
+      var t = i / (MAX_SAMPLES - 1), k = 0;
+      while (k < keys.length - 2 && t > keys[k + 1][0]) k++;
+      var a = keys[k], b = keys[k + 1], f = (t - a[0]) / (b[0] - a[0]);
+      var scene = (Math.floor(i / 34) * 37 % 11) / 11 - 0.5;   // scenes run a few dozen hairlines each
+      var c = [0, 0, 0];
+      for (var j = 0; j < 3; j++) {
+        var v = a[1][j] + (b[1][j] - a[1][j]) * f + scene * 34 + (r() - 0.5) * 16;
+        c[j] = Math.max(0, Math.min(255, Math.round(v)));
+      }
+      out.push(c);
+    }
+    return out;
+  }
+  function samplePhoto() {
+    var c = document.createElement("canvas"); c.width = 1200; c.height = 900;
+    var g = c.getContext("2d");
+    var sky = g.createLinearGradient(0, 0, 0, 900);
+    sky.addColorStop(0, "#f4f1ec"); sky.addColorStop(0.6, "#cfc8c0"); sky.addColorStop(1, "#8d867f");
+    g.fillStyle = sky; g.fillRect(0, 0, 1200, 900);
+    var glow = g.createRadialGradient(600, 260, 20, 600, 260, 520);
+    glow.addColorStop(0, "rgba(255,255,255,.9)"); glow.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = glow; g.fillRect(0, 0, 1200, 900);
+    function person(x, headY, headR, shoulderW, tone) {
+      g.fillStyle = tone;
+      g.beginPath(); g.arc(x, headY, headR, 0, Math.PI * 2); g.fill();
+      g.beginPath();
+      g.moveTo(x - shoulderW, 900);
+      g.quadraticCurveTo(x - shoulderW, headY + headR + 40, x - headR * 0.5, headY + headR + 14);
+      g.lineTo(x + headR * 0.5, headY + headR + 14);
+      g.quadraticCurveTo(x + shoulderW, headY + headR + 40, x + shoulderW, 900);
+      g.closePath(); g.fill();
+    }
+    person(500, 330, 92, 210, "#2e2a2a");
+    person(715, 380, 84, 190, "#f7f4ef");
+    g.fillStyle = "#3a3433"; g.beginPath(); g.arc(715, 368, 88, Math.PI * 1.02, Math.PI * 1.98); g.fill();
+    return c;
+  }
+
+  /* ---------- drawing ---------- */
+  function settings() {
+    return {
+      detail: +$("detail").value, smooth: $("smooth").checked,
+      blend: document.querySelector('input[name="blend"]:checked').value,
+      strength: +$("strength").value / 100, zoom: +$("zoom").value / 100,
+      posX: +$("posX").value / 100, posY: +$("posY").value / 100,
+      edgeFade: $("edgeFade").checked, finish: $("finish").checked, caption: $("caption").value.trim()
+    };
+  }
+  function makeCanvas(w, h) { var c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
+  function draw(canvas, watermark) {
+    FromeDraw.render(canvas, { colors: state.colors, settings: settings() }, state.photo, { makeCanvas: makeCanvas, watermark: !!watermark });
+  }
+  var queued = false;
+  function redraw() {
+    if (queued) return; queued = true;
+    requestAnimationFrame(function () { queued = false; draw(view, false); });
+  }
+
+  /* ---------- video sampling ---------- */
+  function setStatus(id, text, isErr) { var el = $(id); el.textContent = text; el.classList.toggle("err", !!isErr); }
+  function once(target, okEvent, ms) {
+    return new Promise(function (resolve, reject) {
+      var done = false, timer = setTimeout(function () { finish(ms.rejectOnTimeout ? new Error("timeout") : null); }, ms.wait);
+      function finish(err) {
+        if (done) return; done = true; clearTimeout(timer);
+        target.removeEventListener(okEvent, good); target.removeEventListener("error", bad);
+        err ? reject(err) : resolve();
+      }
+      function good() { finish(null); }
+      function bad() { finish(new Error("media")); }
+      target.addEventListener(okEvent, good); target.addEventListener("error", bad);
+    });
+  }
+  function frameAvg(g, v, sw, sh) {
+    g.drawImage(v, 0, 0, sw, sh);
+    var d = g.getImageData(0, 0, sw, sh).data, r = 0, gr = 0, b = 0, px = d.length / 4;
+    for (var p = 0; p < d.length; p += 4) { r += d[p]; gr += d[p + 1]; b += d[p + 2]; }
+    return [r / px, gr / px, b / px];
+  }
+  /* One color per time slice: the mean of every frame read in that slice. A slice with no frame of its own
+     repeats the frame before it, the same way the Frome renderer stretches short videos. */
+  function fillBins(sums, counts, n, upto) {
+    var out = new Array(n), last = null, first = null, i;
+    for (i = 0; i < n; i++) {
+      if (counts[i]) last = [Math.round(sums[i * 3] / counts[i]), Math.round(sums[i * 3 + 1] / counts[i]), Math.round(sums[i * 3 + 2] / counts[i])];
+      if (last && !first) first = last;
+      out[i] = (upto != null && i > upto) ? [0, 0, 0] : last;
+    }
+    if (!first) return [];
+    for (i = 0; i < n; i++) if (!out[i]) out[i] = first;
+    return out;
+  }
+  function readByPlayback(v, dur, n, g, sw, sh, run, onTick) {
+    return new Promise(function (resolve, reject) {
+      var sums = new Float64Array(n * 3), counts = new Uint32Array(n), frames = 0, maxIdx = 0, done = false, lastSeen = performance.now();
+      function finish(ok) {
+        if (done) return; done = true; clearInterval(dog);
+        try { v.pause(); } catch (e) {}
+        ok ? resolve({ sums: sums, counts: counts, frames: frames }) : reject(new Error("stall"));
+      }
+      function onFrame(now, meta) {
+        if (done) return;
+        if (run !== state.run) { done = true; clearInterval(dog); try { v.pause(); } catch (e) {} resolve(null); return; }
+        var idx = Math.max(0, Math.min(n - 1, Math.floor(meta.mediaTime / dur * n)));
+        var c = frameAvg(g, v, sw, sh);
+        sums[idx * 3] += c[0]; sums[idx * 3 + 1] += c[1]; sums[idx * 3 + 2] += c[2];
+        counts[idx]++; frames++; lastSeen = performance.now(); if (idx > maxIdx) maxIdx = idx;
+        if (frames % 12 === 0) onTick(sums, counts, maxIdx);
+        v.requestVideoFrameCallback(onFrame);
+      }
+      var dog = setInterval(function () {
+        if (v.ended) finish(true);
+        else if (performance.now() - lastSeen > 8000) finish(false);
+      }, 500);
+      v.addEventListener("ended", function () { finish(true); }, { once: true });
+      v.addEventListener("error", function () { finish(false); }, { once: true });
+      try { v.playbackRate = Math.min(16, Math.max(1, dur / 15)); } catch (e) { try { v.playbackRate = 4; } catch (e2) {} }
+      v.requestVideoFrameCallback(onFrame);
+      var p = v.play(); if (p && p.catch) p.catch(function () { finish(false); });
+    });
+  }
+  async function readBySeeking(v, dur, g, sw, sh, run, onTick) {
+    var n = Math.max(40, Math.min(1000, Math.floor(dur * 4))), out = [];
+    for (var i = 0; i < n; i++) {
+      if (run !== state.run) return null;
+      var wait = once(v, "seeked", { wait: 4000, rejectOnTimeout: false });
+      v.currentTime = Math.min(dur - 0.05, (i + 0.5) / n * dur);
+      await wait;
+      var c = frameAvg(g, v, sw, sh);
+      out.push([Math.round(c[0]), Math.round(c[1]), Math.round(c[2])]);
+      if (i % 4 === 0 || i === n - 1) onTick(out, (i + 1) / n);
+    }
+    return out;
+  }
+  async function sampleVideo(file) {
+    var run = ++state.run, url = URL.createObjectURL(file);
+    var v = document.createElement("video");
+    v.muted = true; v.playsInline = true; v.preload = "auto";
+    $("bar").style.width = "0%";
+    setStatus("videoStatus", "Opening " + file.name + "…");
+    function pct(f) {
+      var t = Math.round(f * 100);
+      $("bar").style.width = t + "%"; setStatus("videoStatus", "Reading your video… " + t + "%. Keep this tab open.");
+    }
+    try {
+      var ready = once(v, "loadeddata", { wait: 20000, rejectOnTimeout: true });
+      v.src = url; await ready;
+      var dur = v.duration;
+      if (!isFinite(dur) || dur <= 0 || !v.videoWidth) throw new Error("media");
+      var sw = 64, sh = Math.max(1, Math.round(64 * v.videoHeight / v.videoWidth));
+      var c = document.createElement("canvas"); c.width = sw; c.height = sh;
+      var g = c.getContext("2d", { willReadFrequently: true });
+      var colors = null, framesRead = 0;
+      /* Videos up to 20 minutes are played through quickly and every frame shown is averaged into its slice.
+         Longer ones, or browsers without frame callbacks, are read one frame per slice. */
+      if (typeof v.requestVideoFrameCallback === "function" && dur <= 1200) {
+        try {
+          var res = await readByPlayback(v, dur, MAX_SAMPLES, g, sw, sh, run, function (sums, counts, upto) {
+            pct(upto / MAX_SAMPLES); state.colors = fillBins(sums, counts, MAX_SAMPLES, upto); redraw();
+          });
+          if (res === null) return;
+          colors = fillBins(res.sums, res.counts, MAX_SAMPLES, null); framesRead = res.frames;
+        } catch (e) { colors = null; }
+      }
+      if (!colors || !colors.length) {
+        if (run !== state.run) return;
+        colors = await readBySeeking(v, dur, g, sw, sh, run, function (partial, f) {
+          pct(f); state.colors = partial.slice(); redraw();
+        });
+        if (colors === null) return;
+        framesRead = colors.length;
+      }
+      if (run !== state.run) return;
+      var total = 0; for (var k = 0; k < colors.length; k++) total += colors[k][0] + colors[k][1] + colors[k][2];
+      if (total === 0) throw new Error("blank");
+      state.colors = colors;
+      $("bar").style.width = "100%";
+      $("sourceChip").textContent = "Your video"; $("sourceChip").classList.remove("sample");
+      $("sourceNote").textContent = file.name + " · " + fmtTime(dur);
+      setStatus("videoStatus", "Done. " + framesRead + " frames read from " + fmtTime(dur) + " of video.");
+      redraw();
+    } catch (e) {
+      if (run !== state.run) return;
+      $("bar").style.width = "0%";
+      setStatus("videoStatus", e.message === "blank"
+        ? "This browser opened the video but could not read its frames. Try Chrome on a computer, or an MP4 copy of the video."
+        : "This browser could not open that video. MP4 (H.264) and MOV files work best. Try another file.", true);
+    } finally {
+      try { v.pause(); } catch (e3) {}
+      v.removeAttribute("src"); try { v.load(); } catch (e2) {}
+      URL.revokeObjectURL(url);
+    }
+  }
+  function fmtTime(s) { s = Math.round(s); var m = Math.floor(s / 60), r = s % 60; return m + ":" + (r < 10 ? "0" : "") + r; }
+
+  function loadSampleVideo() {
+    state.run++; state.colors = samplePalette();
+    $("bar").style.width = "0%";
+    $("sourceChip").textContent = "Sample palette"; $("sourceChip").classList.add("sample");
+    $("sourceNote").textContent = "A wedding day, morning to night";
+    setStatus("videoStatus", "Showing a sample palette. MP4 and MOV files work best.");
+    redraw();
+  }
+
+  /* ---------- photo ---------- */
+  function photoUi() {
+    $("photoControls").disabled = !state.photo;
+    $("removePhoto").disabled = !state.photo;
+  }
+  function loadPhoto(file) {
+    var url = URL.createObjectURL(file), img = new Image();
+    img.onload = function () {
+      state.photo = img; state.photoIsSample = false;
+      setStatus("photoStatus", "Using " + file.name + ".");
+      photoUi(); redraw();
+    };
+    img.onerror = function () {
+      URL.revokeObjectURL(url);
+      setStatus("photoStatus", "This browser could not open that photo. Save it as a JPG or PNG and try again.", true);
+    };
+    img.src = url;
+  }
+
+  /* ---------- wiring ---------- */
+  $("videoFile").addEventListener("change", function (e) { var f = e.target.files[0]; if (f) sampleVideo(f); e.target.value = ""; });
+  $("useSample").addEventListener("click", loadSampleVideo);
+  $("photoFile").addEventListener("change", function (e) { var f = e.target.files[0]; if (f) loadPhoto(f); e.target.value = ""; });
+  $("removePhoto").addEventListener("click", function () {
+    state.photo = null; setStatus("photoStatus", "No photo. The canvas shows color only."); photoUi(); redraw();
+  });
+  function bindOut(id, outId, fmt) {
+    $(id).addEventListener("input", function () { $(outId).textContent = fmt(+$(id).value); redraw(); });
+  }
+  bindOut("detail", "detailOut", function (v) { return v >= 1500 ? "1500 · Frome standard" : String(v); });
+  bindOut("strength", "strengthOut", function (v) { return v + "%"; });
+  bindOut("zoom", "zoomOut", function (v) { return (v / 100).toFixed(1) + "×"; });
+  ["posX", "posY", "caption"].forEach(function (id) { $(id).addEventListener("input", redraw); });
+  ["smooth", "edgeFade", "finish", "blendTint", "blendFade", "blendSoft"].forEach(function (id) { $(id).addEventListener("change", redraw); });
+
+  /* ---------- save (only where the viewer's app allows it) ---------- */
+  var downloads = null;
+  if (window.claude && typeof window.claude.use === "function") {
+    window.claude.use("downloads").then(function (d) { if (d) { downloads = d; $("save").hidden = false; } }).catch(function () {});
+  }
+  $("save").addEventListener("click", function () {
+    if (!downloads) return;
+    var c = document.createElement("canvas"); c.width = 3000; c.height = 1200; draw(c, true);
+    c.toBlob(function (blob) {
+      if (!blob) { setStatus("saveStatus", "Could not make the image. Try again.", true); return; }
+      downloads.save({ filename: "frome-video-palette-preview.png", data: blob }).then(function () {
+        setStatus("saveStatus", "Preview saved.");
+      }).catch(function (err) {
+        if (err && err.code === "declined") return;
+        setStatus("saveStatus", "Saving is not available in this view.", true);
+      });
+    }, "image/png");
+  });
+
+  /* ---------- start in a working state ---------- */
+  state.colors = samplePalette();
+  state.photo = samplePhoto();
+  photoUi();
+  draw(view, false);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redraw);
+})();
+</script>
+</body>
+</html>
