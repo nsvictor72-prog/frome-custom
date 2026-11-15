@@ -3,7 +3,7 @@
    "preparing" page until then, and restarts a render that stalled or failed. */
 import { openStore } from "../../lib/store.mjs";
 import { triggerRender } from "../../lib/trigger.mjs";
-import { keys, isDesignId, downloadToken, safeEqual } from "../../lib/common.mjs";
+import { keys, isDesignId, downloadToken, safeEqual, kindsOf } from "../../lib/common.mjs";
 
 export const config = {
   path: "/download",
@@ -41,6 +41,11 @@ export default async (req, context) => {
 
   if (!design.paid) {
     return page("Waiting for payment", "<h1>We are waiting for your payment to confirm</h1><p>This usually takes a few seconds after checkout. This page refreshes on its own.</p>", { refresh: 6 });
+  }
+
+  /* A framed-canvas order does not include the digital file. The print file is only reachable by the store owner. */
+  if (!kindsOf(design).includes("digital")) {
+    return page("No download with this order", "<h1>This order is a framed canvas</h1><p>Your Frome is being printed and framed, and it ships to you. It does not include a digital download. Questions? Reply to your order confirmation email.</p>");
   }
 
   if (design.status === "ready") {

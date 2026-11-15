@@ -1,5 +1,5 @@
 node_modules
 .netlify
 .env
-test/out-order.*
+test/out-*
 out/

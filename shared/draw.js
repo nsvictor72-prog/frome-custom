@@ -61,7 +61,11 @@
 
   function render(canvas, design, photo, opts) {
     opts = opts || {};
-    var W = canvas.width, H = canvas.height, ctx = canvas.getContext("2d"), s = cleanSettings(design.settings);
+    /* opts.area = { x, y, w, h } draws the design into part of a larger canvas (the print file's front face,
+       inside its wrap border). Without it the design fills the canvas. */
+    var area = opts.area || { x: 0, y: 0, w: canvas.width, h: canvas.height };
+    var W = area.w, H = area.h, ctx = canvas.getContext("2d"), s = cleanSettings(design.settings);
+    ctx.save(); ctx.translate(area.x, area.y); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
     var cols = bucket(design.colors || [], s.detail), n = cols.length;
     var captionFont = opts.captionFont || "'IBM Plex Sans', 'Segoe UI', sans-serif";
 
@@ -106,9 +110,11 @@
     }
 
     if (s.finish) {
-      /* Frome finish: stripes glow in the middle band and fall away to dark at the top and bottom. */
+      /* Frome finish: stripes glow in the middle and fall away toward the top and bottom. The curve is measured
+         from a catalog print file (2963-52): brightness is about a third of the middle at the very edge. */
       var f = ctx.createLinearGradient(0, 0, 0, H);
-      [[0, .82], [.1, .52], [.26, .14], [.4, 0], [.6, 0], [.74, .14], [.9, .52], [1, .82]].forEach(function (st) {
+      [[0, .66], [.02, .58], [.05, .53], [.1, .44], [.2, .25], [.3, .11], [.4, .03], [.5, 0],
+       [.6, .03], [.7, .11], [.8, .25], [.9, .44], [.95, .53], [.98, .58], [1, .66]].forEach(function (st) {
         f.addColorStop(st[0], "rgba(0,0,0," + st[1] + ")");
       });
       ctx.fillStyle = f; ctx.fillRect(0, 0, W, H);
@@ -137,6 +143,7 @@
       for (var wy = -2; wy <= 2; wy++) for (var wx = -2; wx <= 2; wx++) ctx.fillText("FROME PREVIEW", wx * W * 0.42, wy * H * 0.34);
       ctx.restore();
     }
+    ctx.restore();
     return canvas;
   }
 

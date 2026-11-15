@@ -3,7 +3,8 @@ import crypto from "node:crypto"; import fs from "node:fs"; import os from "node
 import assert from "node:assert/strict";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "frome-"));
 Object.assign(process.env, { FROME_LOCAL_STORE: dir, FROME_INLINE_RENDER: "1", FROME_DOWNLOAD_SECRET: "test-dl", SHOPIFY_WEBHOOK_SECRET: "test-hook",
-  FROME_INTERNAL_KEY: "test-int", FROME_ALLOWED_ORIGINS: "https://frome.co", SHOPIFY_DIGITAL_VARIANT_IDS: "111" });
+  FROME_INTERNAL_KEY: "test-int", FROME_ALLOWED_ORIGINS: "https://frome.co", SHOPIFY_DIGITAL_VARIANT_IDS: "111", SHOPIFY_CANVAS_VARIANT_IDS: "222", FROME_ADMIN_KEY: "test-admin-key-0123456789" });
+const admin = (await import("../netlify/functions/admin.mjs")).default;
 const save = (await import("../netlify/functions/save-design.mjs")).default;
 const paid = (await import("../netlify/functions/order-paid.mjs")).default;
 const download = (await import("../netlify/functions/download.mjs")).default;
@@ -54,6 +55,25 @@ for (const f of ["jpg", "png"]) {
   const img = await canvasPkg.loadImage(buf); assert.equal(img.width, 9000); assert.equal(img.height, 3600);
   assert.match(r.headers.get("content-disposition"), new RegExp("frome-video-palette-1001\\." + f));
   ok(f.toUpperCase() + " downloads at 9000 x 3600, " + (buf.length / 1048576).toFixed(1) + " MB");
+}
+{ // framed canvas order: print file with wrap, reachable only through the owner page
+  const rc = await save(post("https://x.test/api/design", body, { origin: "https://frome.co" })); const c = await rc.json();
+  const t1 = Date.now();
+  r = await paid(hook({ id: 9, name: "#2001", financial_status: "paid", line_items: [{ variant_id: 222, properties: [{ name: "_design_id", value: c.id }] }] }));
+  assert.equal((await r.json()).designs[0].kind, "canvas"); ok("framed canvas order unlocks and renders the print file (" + (Date.now() - t1) + " ms)");
+  r = await dl("", c.token, c.id); assert.match(await r.text(), /This order is a framed canvas/);
+  r = await dl("&f=jpg", c.token, c.id); assert.match(await r.text(), /This order is a framed canvas/); ok("canvas buyer gets no digital download");
+  const adm = (q) => admin(new Request("https://x.test/admin/" + q));
+  r = await adm("orders?k=wrong-key-0123456789abcdef"); assert.equal(r.status, 404);
+  r = await adm("file?d=" + c.id + "&f=print&k=" + c.token); assert.equal(r.status, 404); ok("owner pages refuse a wrong key, including a customer's token");
+  r = await adm("orders?k=test-admin-key-0123456789"); const list = await r.text(); assert.match(list, /#2001/); assert.match(list, /#1001/); assert.match(list, /Print file/); ok("owner page lists paid orders with the print file link");
+  r = await adm("file?d=" + c.id + "&f=print&k=test-admin-key-0123456789"); const pbuf = Buffer.from(await r.arrayBuffer()); fs.writeFileSync("test/out-order-print.jpg", pbuf);
+  const pimg = await canvasPkg.loadImage(pbuf); assert.equal(pimg.width, 9900); assert.equal(pimg.height, 4500);
+  const pc2 = canvasPkg.createCanvas(9900, 4500), g2 = pc2.getContext("2d"); g2.drawImage(pimg, 0, 0);
+  const px = (x, y) => Array.from(g2.getImageData(x, y, 1, 1).data.slice(0, 3));
+  for (const [x, y] of [[200, 2250], [9700, 2250], [4950, 200], [4950, 4300], [100, 100]]) assert.ok(px(x, y).every((v) => v < 6), "wrap must be black at " + x + "," + y);
+  assert.ok(px(1000, 2250).some((v) => v > 30), "front face must carry the design");
+  ok("print file is 9900 x 4500 with a black 450 px wrap on every side, " + (pbuf.length / 1048576).toFixed(1) + " MB");
 }
 r = await save(post("https://x.test/api/design", { colors }, { origin: "https://frome.co" })); const stale = (await r.json()).id;
 assert.equal(await runCleanup(Date.now() + 8 * 86400000), 1); assert.equal(fs.existsSync(path.join(dir, encodeURIComponent("design/" + stale + ".json"))), false);
