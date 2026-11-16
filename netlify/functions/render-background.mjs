@@ -4,6 +4,7 @@
 import { openStore } from "../../lib/store.mjs";
 import { renderDesign, renderPrint } from "../../lib/render.mjs";
 import { env, keys, isDesignId, safeEqual, kindsOf } from "../../lib/common.mjs";
+import { fulfilIfNeeded } from "../../lib/shopify.mjs";
 
 export const config = { path: "/api/render", method: "POST", background: true };
 
@@ -34,6 +35,8 @@ export async function runRender(id) {
     design.status = "ready"; design.readyAt = new Date().toISOString();
     delete design.error;
     console.log("render: finished " + JSON.stringify({ order: design.orderName, made }));
+    /* The download is ready, so the digital line can leave the store's Unfulfilled list. */
+    await fulfilIfNeeded(design, id);
   } catch (e) {
     design.status = "failed"; design.error = String((e && e.message) || e).slice(0, 300);
     console.log("render: FAILED " + JSON.stringify({ order: design.orderName, error: design.error }));

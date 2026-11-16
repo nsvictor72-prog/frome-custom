@@ -4,6 +4,7 @@
 import { openStore } from "../../lib/store.mjs";
 import { triggerRender } from "../../lib/trigger.mjs";
 import { json, keys, isDesignId, shopifyHmacOk, listEnv } from "../../lib/common.mjs";
+import { fulfilIfNeeded } from "../../lib/shopify.mjs";
 
 export const config = { path: "/api/shopify/order-paid", method: "POST" };
 
@@ -42,7 +43,11 @@ export default async (req, context) => {
     const design = await store.getJSON(keys.design(id));
     if (!design) { done.push({ id, result: "unknown_design" }); continue; }
     const had = !!design.paid && (design.kinds && design.kinds.length ? design.kinds : ["digital"]).includes(kind);
-    if (design.status === "ready" && had) { done.push({ id, result: "already_ready" }); continue; }
+    if (design.status === "ready" && had) {
+      /* A later notice for a finished order is the retry for a fulfilment that failed the first time. */
+      if (await fulfilIfNeeded(design, id)) await store.setJSON(keys.design(id), design);
+      done.push({ id, result: "already_ready" }); continue;
+    }
     /* Several notices arrive for one order (created, paid, updated). Only the first starts a render. */
     const started = Date.parse(design.renderStartedAt || design.queuedAt || 0);
     if (had && (design.status === "queued" || design.status === "rendering") && Date.now() - started < IN_PROGRESS_MS) {

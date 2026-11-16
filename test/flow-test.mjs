@@ -75,6 +75,58 @@ for (const f of ["jpg", "png"]) {
   assert.ok(px(1000, 2250).some((v) => v > 30), "front face must carry the design");
   ok("print file is 9900 x 4500 with a black 450 px wrap on every side, " + (pbuf.length / 1048576).toFixed(1) + " MB");
 }
+{
+  /* ---- marking the digital line fulfilled in Shopify (calls to Shopify are faked) ---- */
+  const first = JSON.parse(fs.readFileSync(path.join(dir, encodeURIComponent("design/" + id + ".json"))));
+  assert.equal(first.fulfilledAt, undefined); ok("without Shopify app credentials nothing is fulfilled and nothing fails");
+
+  const realFetch = globalThis.fetch; let calls = [], mode = "ok";
+  const reply = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json" } });
+  const fakeOrder = (designId) => ({ data: { order: { fulfillmentOrders: { nodes: [
+    { id: "gid://shopify/FulfillmentOrder/1", status: "OPEN", supportedActions: [{ action: "CREATE_FULFILLMENT" }], lineItems: { nodes: [
+      { id: "gid://shopify/FulfillmentOrderLineItem/10", remainingQuantity: 1, lineItem: { variant: { id: "gid://shopify/ProductVariant/111" }, customAttributes: [{ key: "_design_id", value: designId }] } },
+      { id: "gid://shopify/FulfillmentOrderLineItem/11", remainingQuantity: 1, lineItem: { variant: { id: "gid://shopify/ProductVariant/222" }, customAttributes: [{ key: "_design_id", value: designId }] } },
+      { id: "gid://shopify/FulfillmentOrderLineItem/12", remainingQuantity: 2, lineItem: { variant: { id: "gid://shopify/ProductVariant/999" }, customAttributes: [] } },
+      { id: "gid://shopify/FulfillmentOrderLineItem/13", remainingQuantity: 1, lineItem: { variant: { id: "gid://shopify/ProductVariant/111" }, customAttributes: [{ key: "_design_id", value: "f".repeat(32) }] } } ] } },
+    { id: "gid://shopify/FulfillmentOrder/2", status: "CLOSED", supportedActions: [], lineItems: { nodes: [
+      { id: "gid://shopify/FulfillmentOrderLineItem/20", remainingQuantity: 0, lineItem: { variant: { id: "gid://shopify/ProductVariant/111" }, customAttributes: [{ key: "_design_id", value: designId }] } } ] } } ] } } } });
+  let currentDesign = "";
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    if (!u.includes("frome-test.myshopify.com")) throw new Error("unexpected network call to " + u);
+    if (u.endsWith("/admin/oauth/access_token")) { calls.push({ kind: "token", body: String(init.body) }); return mode === "bad-token" ? reply({ error: "invalid_client" }, 401) : reply({ access_token: "shpat_test", expires_in: 86399 }); }
+    const body = JSON.parse(init.body); assert.equal(init.headers["X-Shopify-Access-Token"], "shpat_test");
+    if (body.query.startsWith("query")) { calls.push({ kind: "query", id: body.variables.id }); return reply(fakeOrder(currentDesign)); }
+    calls.push({ kind: "fulfil", input: body.variables.fulfillment });
+    return reply({ data: { fulfillmentCreate: mode === "refused" ? { fulfillment: null, userErrors: [{ message: "Fulfillment order is not open" }] } : { fulfillment: { id: "gid://shopify/Fulfillment/1" }, userErrors: [] } } });
+  };
+  Object.assign(process.env, { SHOPIFY_SHOP: " https://Frome-Test.myshopify.com/ ", SHOPIFY_CLIENT_ID: "cid", SHOPIFY_CLIENT_SECRET: "csecret" });
+  const newDesign = async () => { const rr = await save(post("https://x.test/api/design", { colors }, { origin: "https://frome.co" })); return (await rr.json()).id; };
+  const read = (d) => JSON.parse(fs.readFileSync(path.join(dir, encodeURIComponent("design/" + d + ".json"))));
+  const order = (d, num) => hook({ id: num, name: "#" + num, financial_status: "paid", line_items: [{ variant_id: 111, properties: [{ name: "_design_id", value: d }] }] });
+  try {
+    let d = await newDesign(); currentDesign = d;
+    r = await paid(order(d, 3001)); assert.equal((await r.json()).designs[0].result, "render_started");
+    const f = calls.filter((c) => c.kind === "fulfil"); assert.equal(f.length, 1);
+    assert.deepEqual(f[0].input, { notifyCustomer: false, lineItemsByFulfillmentOrder: [{ fulfillmentOrderId: "gid://shopify/FulfillmentOrder/1", fulfillmentOrderLineItems: [{ id: "gid://shopify/FulfillmentOrderLineItem/10", quantity: 1 }] }] });
+    assert.equal(calls.find((c) => c.kind === "query").id, "gid://shopify/Order/3001");
+    assert.match(calls.find((c) => c.kind === "token").body, /grant_type=client_credentials&client_id=cid&client_secret=csecret/);
+    assert.ok(read(d).fulfilledAt); assert.equal(read(d).status, "ready");
+    ok("a ready digital order is fulfilled in Shopify: its own line only, never the canvas or other items, with no customer email");
+    calls = []; r = await paid(order(d, 3001)); assert.equal((await r.json()).designs[0].result, "already_ready"); assert.equal(calls.length, 0); ok("a repeat notice does not fulfil twice");
+
+    mode = "refused"; calls = []; d = await newDesign(); currentDesign = d;
+    r = await paid(order(d, 3002)); assert.equal(read(d).status, "ready"); assert.equal(read(d).fulfilledAt, undefined); assert.match(read(d).fulfilError, /not open/);
+    r = await dl("&f=jpg", (await import("../lib/common.mjs")).downloadToken(d), d); assert.equal(r.status, 200); assert.equal(r.headers.get("content-type"), "image/jpeg"); await r.arrayBuffer();
+    ok("if Shopify refuses, the file is still delivered and the problem is recorded");
+    mode = "ok"; calls = []; r = await paid(order(d, 3002)); assert.equal(calls.filter((c) => c.kind === "fulfil").length, 1); assert.ok(read(d).fulfilledAt); assert.equal(read(d).fulfilError, undefined);
+    ok("the next notice for that order retries the fulfilment");
+
+    mode = "bad-token"; calls = []; d = await newDesign(); currentDesign = d;
+    r = await paid(order(d, 3003)); assert.equal(read(d).status, "ready"); assert.match(read(d).fulfilError, /token request returned 401/); assert.equal(calls.filter((c) => c.kind === "fulfil").length, 0);
+    ok("wrong app credentials do not break delivery");
+  } finally { globalThis.fetch = realFetch; delete process.env.SHOPIFY_SHOP; delete process.env.SHOPIFY_CLIENT_ID; delete process.env.SHOPIFY_CLIENT_SECRET; }
+}
 r = await save(post("https://x.test/api/design", { colors }, { origin: "https://frome.co" })); const stale = (await r.json()).id;
 assert.equal(await runCleanup(Date.now() + 8 * 86400000), 1); assert.equal(fs.existsSync(path.join(dir, encodeURIComponent("design/" + stale + ".json"))), false);
 assert.equal(fs.existsSync(path.join(dir, encodeURIComponent("design/" + id + ".json"))), true); ok("cleanup removes unpaid designs and keeps paid ones");

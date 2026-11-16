@@ -44,6 +44,14 @@ drag-and-drop will not work). Set these environment variables:
 | `FROME_ALLOWED_ORIGINS` | `https://frome.co` (comma-separate more if needed) |
 | `SHOPIFY_WEBHOOK_SECRET` | from the Shopify webhooks page |
 | `SHOPIFY_DIGITAL_VARIANT_IDS` | the digital product's variant id |
+| `SHOPIFY_SHOP` | optional: the store's `.myshopify.com` domain, e.g. `example.myshopify.com` |
+| `SHOPIFY_CLIENT_ID` | optional: client id of a Dev Dashboard app installed on the store |
+| `SHOPIFY_CLIENT_SECRET` | optional: that app's client secret |
+
+The three optional variables switch on automatic fulfilment: once a digital file is ready, the server marks that
+order line as fulfilled in Shopify (without notifying the customer), so digital orders do not stay in the
+Unfulfilled list. The app needs the scopes `read_orders`, `read_merchant_managed_fulfillment_orders` and
+`write_merchant_managed_fulfillment_orders`. Leave them unset and the server never contacts Shopify.
 
 ### 3. Storefront
 `storefront/buy-button.js` is the purchase code to merge into the generator page once it is hosted on frome.co.
