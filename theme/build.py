@@ -44,6 +44,11 @@ h = sub1(h, '''        <div class="row">
         </div>
         <p class="hint" id="saveStatus" role="status"></p>''')
 
+# digital-first wording: nothing on the page describes a physical canvas unless the framed canvas offer is showing
+h = sub1(h, '<span>Canvas shape 5 : 2, as in 30×12 in and 40×16 in</span>', '<span>Digital file · 9000 × 3600 pixels</span>')
+h = sub1(h, 'aria-label="Preview of your video palette canvas"', 'aria-label="Preview of your Video Frome"')
+h = sub1(h, '"No photo. The canvas shows color only."', '"No photo. Your Frome shows color only."')
+
 # ---- script changes ----
 h = sub1(h, 'var state = { colors: [], photo: null, photoIsSample: true, run: 0 };',
          'var state = { colors: [], photo: null, photoIsSample: true, videoIsSample: true, run: 0 };\n  var CFG = { api: "__VF_API__", variant: "__VF_VARIANT__", canvasVariant: "__VF_CANVAS_VARIANT__", cartAdd: "__VF_CART_ADD__", cart: "__VF_CART__" };\n  var SAMPLE_CAPTION = "Maya & Daniel · June 14, 2025";')
@@ -67,7 +72,8 @@ h = sub1(h, '''  function photoUi() {''', '''  function buyUi() {
   /* A 30 x 12 in print: the photo's own pixels spread over 12 inches of height times the zoom. */
   function photoWarn() {
     var el = $("photoWarn"), p = state.photo;
-    if (!p || state.photoIsSample) { el.hidden = true; return; }
+    /* Only relevant while the framed canvas is on sale; the digital file needs no print warning. */
+    if (!p || state.photoIsSample || !/^[0-9]+$/.test(CFG.canvasVariant)) { el.hidden = true; return; }
     var ih = p.naturalHeight || p.height, dpi = ih / (12 * (+$("zoom").value / 100));
     el.hidden = dpi >= 100;
     el.textContent = dpi >= 100 ? "" : "This photo is small for a 30 inch print and may look soft on the framed canvas. A larger photo, or less zoom, prints sharper.";
